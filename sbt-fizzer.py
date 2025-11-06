@@ -24,12 +24,6 @@ testcomp_property_coverage_branches = "COVER( init(main()), FQL(COVER EDGES(@DEC
 testcomp_property_coverage_error_call = "COVER( init(main()), FQL(COVER EDGES(@CALL(reach_error))) )"
 
 
-def _execute(command_and_args, timeout_ = None, stdout_=None, stderr_=None):
-    cmd = [x for x in command_and_args if len(x) > 0]
-    # print("*** CALLING ***\n" + " ".join(cmd) + "\n************\n")
-    return subprocess.run(cmd, timeout=timeout_, stdout=stdout_, stderr=stderr_)
-
-
 def safe_index(lst, item, default=None):
     try:
         return lst.index(item)
@@ -64,6 +58,38 @@ def get_file_arg_of_option(options, option):
     return idx, options[idx + 1]
 
 
+def determine_result(log):
+    RESULT_DONE = "done"
+    RESULT_UNKNOWN = "unknown"
+    # RESULT_TIMEOUT = "TIMEOUT"
+    RESULT_ERROR = "ERROR"
+
+    if not log:
+        return RESULT_UNKNOWN
+
+    termination_type = None
+    termination_reason = None
+    for line in log.splitlines():
+        line = line.strip()
+        if termination_type is None and "termination_type" in line:
+            termination_type = line.split(": ")[1].split('"')[1]
+        elif termination_reason is None and "termination_reason" in line:
+            termination_reason = line.split(": ")[1].split('"')[1]
+
+    # Now we are ready to compute the result string.
+
+    if termination_type not in [ "NORMAL", "SERVER_INTERNAL_ERROR" ]:
+        result_code = RESULT_ERROR
+    elif termination_type != "NORMAL":
+        result_code = RESULT_UNKNOWN
+    elif termination_reason in [ "ALL_REACHABLE_BRANCHINGS_COVERED", "FUZZING_STRATEGY_DEPLETED", "TIME_BUDGET_DEPLETED", "EXECUTIONS_BUDGET_DEPLETED" ]:
+        result_code = RESULT_DONE
+    else:
+        result_code = RESULT_UNKNOWN
+
+    return result_code + " (" + str(termination_type) + "," + str(termination_reason) + ")"
+
+
 def main():
     if "--version" in sys.argv:
         print("1.2.3")
@@ -89,8 +115,18 @@ def main():
         property
         )
 
-    if _execute([ sys.executable, os.path.join(os.path.dirname(__file__), "fizzer", "fizzer.py") ] + options).returncode:
+    result = subprocess.run(
+        [ sys.executable, os.path.join(os.path.dirname(__file__), "fizzer", "fizzer.py") ] + options,
+        capture_output=True,      # Captures stdout and stderr
+        text=True                 # Decodes bytes to string (UTF-8 by default)
+        )
+    if result.returncode:
         raise Exception("Call to Fizzer has failed.")
+
+    print("--- stdout ---"); print(result.stdout, flush=True)
+    print("--- stderr ---"); print(result.stderr, flush=True)
+    print("--- ExitCode ---"); print(result.returncode, flush=True)
+    print("--- TestCompResult ---"); print(determine_result(result.stdout), flush=True)
 
 if __name__ == "__main__":
     exit_code = 0
