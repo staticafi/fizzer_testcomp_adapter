@@ -66,7 +66,7 @@ def get_file_arg_of_option(options, option):
 
 def main():
     if "--version" in sys.argv:
-        print("TestComp2026")
+        print("1.2.3")
         return
 
     options = sys.argv[1:]
