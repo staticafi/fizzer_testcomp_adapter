@@ -133,5 +133,6 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
+        print(str(e), flush=True); print("--- TestCompResult ---"); print("ERROR", flush=True)
         exit_code = 1
     exit(exit_code)
