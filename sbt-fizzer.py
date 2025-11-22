@@ -47,10 +47,12 @@ def generate_testcomp_metadata_xml(input_file, output_dir, use_m32, property):
         f.write(content)
 
 
-def get_file_arg_of_option(options, option):
+def get_file_arg_of_option(options, option, default=None):
     idx = safe_index(options, option)
     if idx is None:
-        raise Exception(f"Missing {option} option.")
+        if default is None:
+            raise Exception(f"Missing {option} option.")
+        return -1, default
     if idx + 1 >= len(options):
         raise Exception(f"Missing argument of the {option} option.")
     if not os.path.isfile(options[idx + 1]):
@@ -97,11 +99,17 @@ def main():
 
     options = sys.argv[1:]
 
-    prp_idx, prp_path = get_file_arg_of_option(options, "--property")
-    with open(prp_path, "r") as f:
-        property = f.read().strip()
-    options[prp_idx] = "--test_type"
-    options[prp_idx + 1] = "testcomp"
+    prp_idx, prp_path = get_file_arg_of_option(options, "--property", "COVER( init(main()), FQL(COVER EDGES(@DECISIONEDGE)) )")
+    if prp_idx == -1:
+        property = prp_path # In this case it is the actual property (not a path to the property file).
+        options.append("--test_type")
+        options.append("testcomp")
+        print("WARNING: The option --property was not passed to the tool. Using the default property: " + property, flush=True)
+    else:
+        with open(prp_path, "r") as f:
+            property = f.read().strip()
+        options[prp_idx] = "--test_type"
+        options[prp_idx + 1] = "testcomp"
 
     output_dir = os.path.abspath(os.getcwd())
     options.append("--output_dir")
